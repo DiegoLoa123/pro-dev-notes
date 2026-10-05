@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 import type { Note } from '../domain/Note';
 import { noteService } from '../services/note.service';
+import { NoteEditor } from '../../editor/components/NoteEditor';
 
 type ViewMode = 'notes' | 'trash';
 
@@ -256,13 +257,9 @@ export function NoteManager() {
                 </label>
                 <br />
 
-                <textarea
-                  id="content"
-                  value={notesContent}
-                  onChange={(event) => handleContentChange(event.target.value)}
-                  placeholder="Escribe algo..."
-                  rows={20}
-                  style={{ width: '100%' }}
+                <NoteEditor
+                  content={notesContent}
+                  onChange={handleContentChange}
                 />
               </div>
               <br />
@@ -286,11 +283,9 @@ export function NoteManager() {
             selectedDeletedNote && (
               <>
                 <h2>{selectedDeletedNote.title}</h2>
-                <textarea
-                  readOnly
-                  value={selectedDeletedNote.content}
-                  rows={20}
-                  style={{ width: '100%' }}
+                <NoteEditor
+                  content={selectedDeletedNote.content}
+                  editable={false}
                 />
                 <br />
 

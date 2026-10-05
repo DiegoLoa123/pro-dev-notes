@@ -14,35 +14,33 @@
 
 ---
 # Fase 2 — Editor enriquecido
+☑ Instalar Tiptap
+☑ Sustituir textarea por editor
 
-☐ Instalar Tiptap
+☑ Bold
+☑ Italic
+☑ Underline
 
-☐ Sustituir textarea por editor
+☑ Heading 1
+☑ Heading 2
+☑ Heading 3
 
-☐ Bold
-☐ Italic
-☐ Underline
+☑ Bullet List
+☑ Ordered List
 
-☐ Heading 1
-☐ Heading 2
-☐ Heading 3
+☑ Blockquote
 
-☐ Bullet List
-☐ Ordered List
+☑ Code
+☑ CodeBlock
 
-☐ Blockquote
+☑ Text color
+☑ Highlight
 
-☐ Code
-☐ CodeBlock
+☑ Undo
+☑ Redo
 
-☐ Text color
-☐ Highlight
-
-☐ Undo
-☐ Redo
-
-☐ Persistir contenido Tiptap
-☐ Migración DB v1 → v2
+☑ Persistir contenido Tiptap
+☑ Migración DB v1 → v2
 
 ---
 # Fase 3
