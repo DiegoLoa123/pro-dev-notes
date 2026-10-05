@@ -29,7 +29,7 @@ class NoteService {
       createdAt: now,
       updatedAt: now,
 
-      isDeleted: false,
+      isDeleted: 0, //0 == false
       deletedAt: null,
     };
 
@@ -47,13 +47,8 @@ class NoteService {
   ): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
-
-    if (note.isDeleted) {
-      throw new Error('No se puede editar una nota eliminada.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (note.isDeleted) throw new Error('No se puede editar una nota eliminada.');
 
     await noteRepository.update(id, {
       ...data,
@@ -70,12 +65,11 @@ class NoteService {
   async moveToTrash(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (note.isDeleted) return;
 
     await noteRepository.update(id, {
-      isDeleted: true,
+      isDeleted: 1, //1 == true
       deletedAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -84,12 +78,11 @@ class NoteService {
   async restoreNote(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (!note.isDeleted) return;
 
     await noteRepository.update(id, {
-      isDeleted: false,
+      isDeleted: 0, //0 == false
       deletedAt: null,
       updatedAt: Date.now(),
     });
@@ -97,11 +90,7 @@ class NoteService {
 
   async deletePermanently(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
-
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
-
+    if (!note) throw new Error('La nota no existe.');
     await noteRepository.delete(id);
   }
 }

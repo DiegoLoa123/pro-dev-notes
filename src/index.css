@@ -11,6 +11,10 @@ body {
   font-family: Arial, sans-serif;
 }
 
+button {
+  background: #464646;
+}
+
 button,
 input,
 textarea {
@@ -20,7 +24,15 @@ textarea {
 input,
 textarea {
   padding: 8px;
+  border: 2px solid #9b9b9b;
 }
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border: 2px solid #1b1b1b; 
+}
+
 
 button {
   padding: 6px 10px;

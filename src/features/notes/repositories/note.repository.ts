@@ -3,17 +3,27 @@ import type { Note } from '../domain/Note';
 
 class NoteRepository {
   async findAll(): Promise<Note[]> {
-    return db.notes
-      .filter((note) => !note.isDeleted)
-      .reverse()
-      .sortBy('updatedAt');
+    const notes = await db.notes
+      .where('isDeleted')
+      .equals(0)
+      .toArray();
+
+    return notes.sort(
+      (a, b) => b.updatedAt - a.updatedAt,
+    );
   }
 
   async findDeleted(): Promise<Note[]> {
-    return db.notes
-      .filter((note) => note.isDeleted)
-      .reverse()
-      .sortBy('deletedAt');
+    const notes = await db.notes
+      .where('isDeleted')
+      .equals(1)
+      .toArray();
+
+    return notes.sort(
+      (a, b) =>
+        (b.deletedAt ?? 0) -
+        (a.deletedAt ?? 0),
+    );
   }
 
   async findById(id: string): Promise<Note | undefined> {

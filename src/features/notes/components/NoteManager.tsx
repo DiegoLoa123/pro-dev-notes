@@ -1,175 +1,309 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import type { Note } from '../domain/Note';
 import { noteService } from '../services/note.service';
 
+type ViewMode = 'notes' | 'trash';
+
 export function NoteManager() {
+  const [viewMode, setViewMode] = useState<ViewMode>('notes');
+
   const notes = useLiveQuery(
-    () => noteService.getNotes(),
-    [], [],
+    () => noteService.getNotes(), [], [],
+  );
+  const deletedNotes = useLiveQuery(
+    () => noteService.getDeletedNotes(), [], [],
   );
 
-  const [selectedNote, setSelectedNote] =
-    useState<Note | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [notesTitle, setNotesTitle] = useState('');
+  const [notesContent, setNotesContent] = useState('');
+
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const selectedNote =
+    notes.find(
+      (note) => note.id === selectedNoteId,
+    ) ?? null;
+
+  const selectedDeletedNote =
+    deletedNotes.find(
+      (note) => note.id === selectedNoteId,
+    ) ?? null;
 
   const handleNewNote = () => {
-    setSelectedNote(null);
-    setTitle('');
-    setContent('');
+    setSelectedNoteId(null);
+
+    setNotesTitle('');
+    setNotesContent('');
+
+    setIsDirty(false);
+
+    setViewMode('notes');
   };
 
   const handleSelectNote = (note: Note) => {
-    setSelectedNote(note);
+    setSelectedNoteId(note.id);
 
-    setTitle(note.title);
-    setContent(note.content);
+    setNotesTitle(note.title);
+    setNotesContent(note.content);
+
+    setIsDirty(false);
   };
 
-  const handleSave = async () => {
-    try {
-      if (selectedNote) {
-        await noteService.updateNote(selectedNote.id, {
-          title,
-          content,
-        });
-
-        setSelectedNote({
-          ...selectedNote,
-          title: title.trim() || 'Sin título',
-          content,
-          updatedAt: Date.now(),
-        });
-
-        return;
-      }
-
-      const newNote = await noteService.createNote(
-        title,
-        content,
-      );
-
-      setSelectedNote(newNote);
-
-      setTitle(newNote.title);
-      setContent(newNote.content);
-    } catch (error) {
-      console.error(error);
-    }
+  const handleTitleChange = (
+    value: string,
+  ) => {
+    setNotesTitle(value);
+    setIsDirty(true);
   };
 
-  const handleDelete = async () => {
-    if (!selectedNote) {
+  const handleContentChange = (
+    value: string,
+  ) => {
+    setNotesContent(value);
+    setIsDirty(true);
+  };
+
+  const saveCurrentNote = async () => {
+    if (!isDirty) {
       return;
     }
 
-    await noteService.moveToTrash(selectedNote.id);
+    setIsSaving(true);
 
+    try {
+      if (selectedNoteId) {
+        await noteService.updateNote(
+          selectedNoteId,
+          {
+            title: notesTitle,
+            content: notesContent,
+          },
+        );
+      } else {
+        const newNote =
+          await noteService.createNote(
+            notesTitle,
+            notesContent,
+          );
+
+        setSelectedNoteId(newNote.id);
+
+        setNotesTitle(newNote.title);
+        setNotesContent(newNote.content);
+      }
+
+      setIsDirty(false);
+    } catch (error) {
+      console.error('Error guardando nota:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDirty) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(
+      () => {
+        void saveCurrentNote();
+      }, 1500,
+    );
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [notesTitle, notesContent, isDirty, selectedNoteId]);
+
+  const handleMoveToTrash = async () => {
+    if (!selectedNoteId) return;
+    await noteService.moveToTrash(selectedNoteId);
     handleNewNote();
+  };
+
+  const handleRestore = async (
+    noteId: string,
+  ) => {
+    await noteService.restoreNote(noteId);
+
+    setSelectedNoteId(null);
+    setNotesTitle('');
+    setNotesContent('');
+  };
+
+  const handleDeletePermanently = async (
+    noteId: string,
+  ) => {
+    const confirmed = window.confirm('¿Eliminar esta nota definitivamente?');
+    if (!confirmed) return;
+
+    await noteService.deletePermanently(noteId);
+
+    setSelectedNoteId(null);
+    setNotesTitle('');
+    setNotesContent('');
+  };
+
+  const handleChangeView = (
+    mode: ViewMode,
+  ) => {
+    setViewMode(mode);
+
+    setSelectedNoteId(null);
+    setNotesTitle('');
+    setNotesContent('');
+    setIsDirty(false);
   };
 
   return (
     <div>
       <h1>Offline Notes</h1>
 
-      <button onClick={handleNewNote}>
-        Nueva nota
-      </button>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={handleNewNote}>
+          Nueva nota
+        </button>
+
+        <button onClick={() => handleChangeView('notes')}>
+          Notas
+        </button>
+
+        <button onClick={() => handleChangeView('trash')}>
+          Papelera
+        </button>
+      </div>
 
       <hr />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '250px 1fr',
-          gap: '20px',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '20px' }}>
         <aside>
-          <h2>Notas</h2>
+          {viewMode === 'notes' && (
+            <>
+              <h2>Notas</h2>
+              {notes.length === 0 && (
+                <p>No tienes notas.</p>
+              )}
 
-          {notes.length === 0 && (
-            <p>No tienes notas todavía.</p>
+              {notes.map((note) => (
+                <button
+                  key={note.id}
+                  onClick={() => handleSelectNote(note)}
+                  style={{ display: 'block', width: '100%', marginBottom: '8px' }}
+                >
+                  {note.title}
+                </button>
+              ))}
+            </>
           )}
 
-          {notes.map((note) => (
-            <button
-              key={note.id}
-              onClick={() => handleSelectNote(note)}
-              style={{
-                display: 'block',
-                width: '100%',
-                marginBottom: '8px',
-              }}
-            >
-              {note.title}
-            </button>
-          ))}
+          {viewMode === 'trash' && (
+            <>
+              <h2>Papelera</h2>
+              {deletedNotes.length === 0 && (
+                <p>
+                  La papelera está
+                  vacía.
+                </p>
+              )}
+
+              {deletedNotes.map(
+                (note) => (
+                  <button
+                    key={note.id}
+                    onClick={() => handleSelectNote(note)}
+                    style={{ display: 'block', width: '100%', marginBottom: '8px' }}
+                  >
+                    {note.title}
+                  </button>
+                ),
+              )}
+            </>
+          )}
         </aside>
 
         <main>
-          <div>
-            <label htmlFor="title">
-              Título
-            </label>
-
-            <br />
-
-            <input
-              id="title"
-              value={title}
-              onChange={(event) =>
-                setTitle(event.target.value)
-              }
-              placeholder="Título de la nota"
-              style={{
-                width: '100%',
-                marginBottom: '16px',
-              }}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="content">
-              Contenido
-            </label>
-
-            <br />
-
-            <textarea
-              id="content"
-              value={content}
-              onChange={(event) =>
-                setContent(event.target.value)
-              }
-              placeholder="Escribe algo..."
-              rows={20}
-              style={{
-                width: '100%',
-              }}
-            />
-          </div>
-
-          <br />
-
-          <button onClick={handleSave}>
-            Guardar
-          </button>
-
-          {selectedNote && (
+          {viewMode === 'notes' && (
             <>
-              {' '}
+              <div>
+                <label htmlFor="title">
+                  Título
+                </label>
+                <br />
 
-              <button onClick={handleDelete}>
-                Enviar a papelera
-              </button>
+                <input
+                  id="title"
+                  value={notesTitle}
+                  onChange={(event) => handleTitleChange(event.target.value)}
+                  placeholder="Título de la nota"
+                  style={{ width: '100%', marginBottom: '16px' }}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="content">
+                  Contenido
+                </label>
+                <br />
+
+                <textarea
+                  id="content"
+                  value={notesContent}
+                  onChange={(event) => handleContentChange(event.target.value)}
+                  placeholder="Escribe algo..."
+                  rows={20}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <br />
+
+              <p>
+                mss: {isSaving
+                  ? 'Guardando...' : isDirty
+                    ? 'Cambios pendientes'
+                    : 'Guardado'}
+              </p>
+
+              {selectedNote && (
+                <button onClick={handleMoveToTrash}>
+                  Enviar a papelera
+                </button>
+              )}
             </>
           )}
+
+          {viewMode === 'trash' &&
+            selectedDeletedNote && (
+              <>
+                <h2>{selectedDeletedNote.title}</h2>
+                <textarea
+                  readOnly
+                  value={selectedDeletedNote.content}
+                  rows={20}
+                  style={{ width: '100%' }}
+                />
+                <br />
+
+                <button onClick={() => handleRestore(selectedDeletedNote.id)}>
+                  Restaurar
+                </button>
+                <button onClick={() => handleDeletePermanently(selectedDeletedNote.id)}>
+                  Eliminar definitivamente
+                </button>
+              </>
+            )}
         </main>
       </div>
     </div>
-  );
+  )
 }

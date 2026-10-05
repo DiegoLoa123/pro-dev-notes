@@ -7,6 +7,6 @@ export interface Note {
   createdAt: number;
   updatedAt: number;
 
-  isDeleted: boolean;
+  isDeleted: 0 | 1;
   deletedAt: number | null;
 }
