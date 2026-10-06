@@ -44,6 +44,32 @@ class NoteRepository {
   async delete(id: string): Promise<void> {
     await db.notes.delete(id);
   }
+
+
+  /**********/
+  async findByFolderId(
+    folderId: string,
+  ): Promise<Note[]> {
+    const notes = await db.notes
+      .where('folderId')
+      .equals(folderId)
+      .toArray();
+
+    return notes
+      .filter((note) => note.isDeleted === 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async findUnfoldered(): Promise<Note[]> {
+    const notes = await db.notes.toArray();
+    return notes
+      .filter(
+        (note) =>
+          note.isDeleted === 0 &&
+          note.folderId === null,
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
 }
 
 export const noteRepository = new NoteRepository();
