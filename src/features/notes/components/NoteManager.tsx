@@ -59,10 +59,17 @@ export function NoteManager() {
   const selectedDeletedNote = deletedNotes.find((note) => note.id === selectedNoteId) ?? null;
 
   const resetEditor = () => {
+    // Cancela cualquier autosave pendiente
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
     setSelectedNoteId(null);
     setNotesTitle('');
     setNotesContent('');
     setIsDirty(false);
+    setIsSaving(false);
   };
 
   const handleNewNote = () => {
@@ -93,9 +100,21 @@ export function NoteManager() {
     setIsDirty(true);
   };
 
+  const hasRealContent = (html: string): boolean => {
+    const text = html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    return text.length > 0;
+  };
+
   const saveCurrentNote =
     async () => {
       if (!isDirty) return;
+      if (!selectedNoteId && !notesContent.trim()) return;
+      if (!selectedNoteId && !hasRealContent(notesContent)) return;
+      // Una nota nueva necesita contenido real, el título no es suficiente.
+
       setIsSaving(true);
 
       try {
@@ -128,7 +147,8 @@ export function NoteManager() {
     if (!isDirty) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      void saveCurrentNote() }, 1000);
+      void saveCurrentNote()
+    }, 1000);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
