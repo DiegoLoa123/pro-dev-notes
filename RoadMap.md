@@ -78,14 +78,13 @@
 ---
 
 # Fase 4 - Tags
+☑ Crear Tag
+☑ Editar Tag
+☑ Eliminar Tag
 
-☐ Crear Tag
-☐ Editar Tag
-☐ Eliminar Tag
-
-☐ Asociar múltiples tags a nota
-☐ Quitar tag
-☐ Filtrar notas por tag
+☑ Asociar múltiples tags a nota
+☑ Quitar tag
+☑ Filtrar notas por tag
 
 ---
 
@@ -97,7 +96,7 @@
 ☐ Links persistentes al mover nota
 ☐ Links persistentes al renombrar nota
 ☐ Detectar enlaces rotos
-☐ Backlinks
+☐ Nextlinks y Backlinks
 
 ---
 

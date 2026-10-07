@@ -6,6 +6,9 @@ import { noteService } from '../services/note.service';
 import { NoteEditor } from '../../editor/components/NoteEditor';
 import { folderService } from '../../folders/services/folder.service';
 import { FolderSidebar } from '../../folders/components/FolderSidebar';
+import { tagService } from '../../tags/services/tag.service';
+import { TagManager } from '../../tags/components/TagManager';
+import { NoteTags } from '../../tags/components/NoteTags';
 
 type ViewMode = | 'notes' | 'trash';
 
@@ -17,14 +20,33 @@ export function NoteManager() {
   const notes = useLiveQuery(() => noteService.getNotes(), [], [],);
   const deletedNotes = useLiveQuery(() => noteService.getDeletedNotes(), [], [],);
   const folders = useLiveQuery(() => folderService.getFolders(), [], [],);
+  const tags = useLiveQuery(() => tagService.getTags(), [], [],);
 
-  const visibleNotes =
-    useMemo(() => {
-      if (folderFilter === undefined) return notes;
-      if (folderFilter === null) return notes.filter((note) => note.folderId === null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const noteIdsByTag = useLiveQuery(() =>
+    tagFilter
+      ? tagService.getNoteIdsByTag(tagFilter)
+      : Promise.resolve<string[]>([]),
+    [tagFilter],[],
+  );
 
-      return notes.filter((note) => note.folderId === folderFilter);
-    }, [notes, folderFilter]);
+  const visibleNotes = useMemo(() => {
+    let result = notes;
+
+    // FILTRO POR CARPETA
+    if (folderFilter === null) {
+      result = result.filter((note) => note.folderId === null);
+    } else if (folderFilter !== undefined) {
+      result = result.filter((note) => note.folderId === folderFilter);
+    }
+
+    // FILTRO POR TAG
+    if (tagFilter !== null) {
+      const noteIds = new Set(noteIdsByTag);
+      result = result.filter((note) => noteIds.has(note.id));
+    }
+    return result;
+  }, [notes, folderFilter, tagFilter, noteIdsByTag]);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [notesTitle, setNotesTitle] = useState('');
@@ -130,6 +152,7 @@ export function NoteManager() {
     async (noteId: string) => {
       const confirmed = window.confirm('¿Eliminar esta nota definitivamente?');
       if (!confirmed) return;
+      await tagService.deleteNoteRelations(noteId);
       await noteService.deletePermanently(noteId);
       resetEditor();
     };
@@ -198,6 +221,7 @@ export function NoteManager() {
                   selectedFolderId={folderFilter}
                   onSelectFolder={setFolderFilter}
                 />
+
                 <hr className="my-4" />
                 <h2 className="mb-2 font-semibold">Notas</h2>
 
@@ -222,6 +246,13 @@ export function NoteManager() {
                     ),
                   )}
                 </div>
+
+                <hr className="my-4" />
+                <TagManager
+                  tags={tags}
+                  selectedTagId={tagFilter}
+                  onSelectTag={setTagFilter}
+                />
               </>
             )}
 
@@ -286,10 +317,7 @@ export function NoteManager() {
                         <option value="">Sin carpeta</option>
                         {folders.map(
                           (folder) => (
-                            <option
-                              key={folder.id}
-                              value={folder.id}
-                            >
+                            <option key={folder.id} value={folder.id}>
                               {folder.name}
                             </option>
                           ),
@@ -297,6 +325,12 @@ export function NoteManager() {
                       </select>
                     </div>
                   )}
+
+                  {selectedNote && (
+                    <NoteTags noteId={selectedNote.id} tags={tags}/>
+                  )}
+
+                  <div className="mb-4" />
                 </section>
 
                 <div>

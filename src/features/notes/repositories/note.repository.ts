@@ -34,10 +34,7 @@ class NoteRepository {
     return db.notes.add(note);
   }
 
-  async update(
-    id: string,
-    changes: Partial<Note>,
-  ): Promise<number> {
+  async update(id: string, changes: Partial<Note>): Promise<number> {
     return db.notes.update(id, changes);
   }
 
