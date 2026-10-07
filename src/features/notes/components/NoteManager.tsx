@@ -1,63 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import type { Note } from '../domain/Note';
 import { noteService } from '../services/note.service';
 import { NoteEditor } from '../../editor/components/NoteEditor';
 import { folderService } from '../../folders/services/folder.service';
+import { FolderSidebar } from '../../folders/components/FolderSidebar';
 
-type ViewMode = 'notes' | 'trash';
+type ViewMode = | 'notes' | 'trash';
 
 export function NoteManager() {
   const [viewMode, setViewMode] = useState<ViewMode>('notes');
+  const [folderFilter, setFolderFilter] =
+    useState<string | null | undefined>(undefined); //undefined = todas | null = sin carpeta | string = folderId
 
-  const notes = useLiveQuery(
-    () => noteService.getNotes(), [], [],
-  );
-  const deletedNotes = useLiveQuery(
-    () => noteService.getDeletedNotes(), [], [],
-  );
-  const folders = useLiveQuery(
-    () => folderService.getFolders(), [], [],
-  );
+  const notes = useLiveQuery(() => noteService.getNotes(), [], [],);
+  const deletedNotes = useLiveQuery(() => noteService.getDeletedNotes(), [], [],);
+  const folders = useLiveQuery(() => folderService.getFolders(), [], [],);
+
+  const visibleNotes =
+    useMemo(() => {
+      if (folderFilter === undefined) return notes;
+      if (folderFilter === null) return notes.filter((note) => note.folderId === null);
+
+      return notes.filter((note) => note.folderId === folderFilter);
+    }, [notes, folderFilter]);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-
   const [notesTitle, setNotesTitle] = useState('');
   const [notesContent, setNotesContent] = useState('');
-
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
+  const selectedDeletedNote = deletedNotes.find((note) => note.id === selectedNoteId) ?? null;
 
-  const selectedNote =
-    notes.find(
-      (note) => note.id === selectedNoteId,
-    ) ?? null;
-
-  const selectedDeletedNote =
-    deletedNotes.find(
-      (note) => note.id === selectedNoteId,
-    ) ?? null;
-
-  const handleNewNote = () => {
+  const resetEditor = () => {
     setSelectedNoteId(null);
-
     setNotesTitle('');
     setNotesContent('');
-
     setIsDirty(false);
+  };
 
+  const handleNewNote = () => {
+    resetEditor();
     setViewMode('notes');
   };
 
-  const handleSelectNote = (note: Note) => {
+  const handleSelectNote = (
+    note: Note,
+  ) => {
     setSelectedNoteId(note.id);
-
     setNotesTitle(note.title);
     setNotesContent(note.content);
-
     setIsDirty(false);
   };
 
@@ -75,283 +71,296 @@ export function NoteManager() {
     setIsDirty(true);
   };
 
-  const saveCurrentNote = async () => {
-    if (!isDirty) {
-      return;
-    }
+  const saveCurrentNote =
+    async () => {
+      if (!isDirty) return;
+      setIsSaving(true);
 
-    setIsSaving(true);
-
-    try {
-      if (selectedNoteId) {
-        await noteService.updateNote(
-          selectedNoteId,
-          {
-            title: notesTitle,
-            content: notesContent,
-          },
-        );
-      } else {
-        const newNote =
-          await noteService.createNote(
-            notesTitle,
-            notesContent,
+      try {
+        if (selectedNoteId) {
+          await noteService.updateNote(
+            selectedNoteId,
+            {
+              title: notesTitle,
+              content: notesContent,
+            },
           );
+        } else {
+          const initialFolderId =
+            typeof folderFilter === 'string'
+              ? folderFilter : null;
 
-        setSelectedNoteId(newNote.id);
+          const newNote = await noteService.createNote(notesTitle, notesContent, initialFolderId);
+          setSelectedNoteId(newNote.id);
+          setNotesTitle(newNote.title);
+          setNotesContent(newNote.content);
+        }
+        setIsDirty(false);
 
-        setNotesTitle(newNote.title);
-        setNotesContent(newNote.content);
-      }
-
-      setIsDirty(false);
-    } catch (error) {
-      console.error('Error guardando nota:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      } catch (error) {
+        console.error('Error guardando nota:', error)
+      } finally { setIsSaving(false) }
+    };
 
   useEffect(() => {
     if (!isDirty) return;
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(
-      () => {
-        void saveCurrentNote();
-      }, 1500,
-    );
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      void saveCurrentNote() }, 1000);
 
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [notesTitle, notesContent, isDirty, selectedNoteId]);
 
-  const handleMoveToTrash = async () => {
-    if (!selectedNoteId) return;
-    await noteService.moveToTrash(selectedNoteId);
-    handleNewNote();
-  };
+  const handleMoveToTrash =
+    async () => {
+      if (!selectedNoteId) return;
+      await noteService.moveToTrash(selectedNoteId);
+      resetEditor();
+    };
 
-  const handleRestore = async (
-    noteId: string,
-  ) => {
-    await noteService.restoreNote(noteId);
+  const handleRestore =
+    async (noteId: string) => {
+      await noteService.restoreNote(noteId);
+      resetEditor();
+    };
 
-    setSelectedNoteId(null);
-    setNotesTitle('');
-    setNotesContent('');
-  };
-
-  const handleDeletePermanently = async (
-    noteId: string,
-  ) => {
-    const confirmed = window.confirm('¿Eliminar esta nota definitivamente?');
-    if (!confirmed) return;
-
-    await noteService.deletePermanently(noteId);
-
-    setSelectedNoteId(null);
-    setNotesTitle('');
-    setNotesContent('');
-  };
+  const handleDeletePermanently =
+    async (noteId: string) => {
+      const confirmed = window.confirm('¿Eliminar esta nota definitivamente?');
+      if (!confirmed) return;
+      await noteService.deletePermanently(noteId);
+      resetEditor();
+    };
 
   const handleChangeView = (
     mode: ViewMode,
   ) => {
     setViewMode(mode);
-
-    setSelectedNoteId(null);
-    setNotesTitle('');
-    setNotesContent('');
-    setIsDirty(false);
+    resetEditor();
   };
 
-  const handleCreateFolder = async () => {
-    const name = window.prompt('Nombre de la carpeta');
+  const handleMoveNote =
+    async (folderId: string | null) => {
+      if (!selectedNote) return;
+      try {
+        await noteService.moveNoteToFolder(selectedNote.id, folderId);
+        setFolderFilter(folderId); //Después de mover, mostrar la carpeta destino.
 
-    if (!name) return;
-    try {
-      await folderService.createFolder(name);
-    } catch (error) {
-      console.error('Error creando carpeta:', error);
-    }
-  };
+      } catch (error) {
+        console.error(error);
+        window.alert(
+          error instanceof Error
+            ? error.message : 'No se pudo mover la nota.',
+        );
+      }
+    };
 
   return (
-    <div>
-      <h1>Offline Notes</h1>
-
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={handleCreateFolder}>
-          + Nueva carpeta
-        </button>
-
-        <button onClick={handleNewNote}>
-          Nueva nota
-        </button>
-
-        <button onClick={() => handleChangeView('notes')}>
-          Notas
-        </button>
-
-        <button onClick={() => handleChangeView('trash')}>
-          Papelera
-        </button>
-      </div>
-
-      <hr />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '20px' }}>
-        <aside>
-          <h3>Carpetas</h3>
-          {folders.length === 0 && (
-            <p style={{ textAlign: 'center' }}>No tienes carpetas.</p>
-          )}
-
-          {folders.map((folder) => (
-            <button key={folder.id} style={{ display: 'block', width: '100%', marginBottom: '4px' }}>
-              📁 {folder.name}
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <div className="mx-auto max-w-7xl p-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">Offline Notes</h1>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleNewNote}
+              className="rounded bg-violet-600 px-4 py-2 text-white hover:bg-violet-700"
+            >
+              + Nueva nota
             </button>
-          ))}
-          <br />
 
-          {viewMode === 'notes' && (
-            <>
-              <h2>Notas</h2>
-              {notes.length === 0 && (
-                <p>No tienes notas.</p>
-              )}
+            <button
+              type="button"
+              onClick={() => handleChangeView('notes')}
+              className="rounded border bg-white px-4 py-2 hover:bg-gray-100"
+            >
+              Notas
+            </button>
 
-              {notes.map((note) => (
-                <button
-                  key={note.id}
-                  onClick={() => handleSelectNote(note)}
-                  style={{ display: 'block', width: '100%', marginBottom: '8px' }}
-                >
-                  {note.title}
-                </button>
-              ))}
-            </>
-          )}
+            <button
+              type="button"
+              onClick={() => handleChangeView('trash')}
+              className="rounded border bg-white px-4 py-2 hover:bg-gray-100"
+            >
+              Papelera
+            </button>
+          </div>
+        </header>
 
-          {viewMode === 'trash' && (
-            <>
-              <h2>Papelera</h2>
-              {deletedNotes.length === 0 && (
-                <p>
-                  La papelera está
-                  vacía.
-                </p>
-              )}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="rounded-lg border bg-white p-3">
+            {viewMode === 'notes' && (
+              <>
+                <FolderSidebar
+                  folders={folders}
+                  selectedFolderId={folderFilter}
+                  onSelectFolder={setFolderFilter}
+                />
+                <hr className="my-4" />
+                <h2 className="mb-2 font-semibold">Notas</h2>
 
-              {deletedNotes.map(
-                (note) => (
-                  <button
-                    key={note.id}
-                    onClick={() => handleSelectNote(note)}
-                    style={{ display: 'block', width: '100%', marginBottom: '8px' }}
-                  >
-                    {note.title}
-                  </button>
-                ),
-              )}
-            </>
-          )}
-        </aside>
+                {visibleNotes.length === 0 && (
+                  <p className="py-4 text-center text-sm text-gray-500">
+                    No tienes notas.
+                  </p>
+                )}
 
-        <main>
-          {viewMode === 'notes' && (
-            <>
-              <section className="flex flex-col gap-4 w-full">
-                <div className="flex flex-row items-end gap-4 w-full">
-                  {/* Campo del Título */}
-                  <div className="flex-1 flex flex-col gap-1">
-                    <label htmlFor="title" className="text-sm font-medium text-gray-700">Título</label>
+                <div className="space-y-1">
+                  {visibleNotes.map(
+                    (note) => (
+                      <button
+                        type="button"
+                        key={note.id}
+                        onClick={() => handleSelectNote(note)}
+                        className={`w-full truncate rounded-md px-3 py-2 text-left
+                          ${selectedNoteId === note.id ? 'bg-violet-100 font-medium' : 'hover:bg-gray-100'}`}
+                      >
+                        {note.title}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </>
+            )}
+
+            {viewMode === 'trash' && (
+              <>
+                <h2 className="mb-2 font-semibold">Papelera</h2>
+                {deletedNotes.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    La papelera está vacía.
+                  </p>
+                )}
+
+                <div className="space-y-1">
+                  {deletedNotes.map(
+                    (note) => (
+                      <button
+                        type="button"
+                        key={note.id}
+                        onClick={() => handleSelectNote(note)}
+                        className="w-full truncate rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                      >
+                        {note.title}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </>
+            )}
+          </aside>
+
+          <main className="min-w-0 rounded-lg border bg-white p-5">
+            {viewMode === 'notes' && (
+              <>
+                <section className="mb-4 flex flex-col gap-4 md:flex-row md:items-end">
+                  <div className="flex-1">
+                    <label htmlFor="title" className="mb-1 block text-sm font-medium">Título</label>
+
                     <input
                       id="title"
                       value={notesTitle}
                       onChange={(event) => handleTitleChange(event.target.value)}
                       placeholder="Título de la nota"
-                      className="w-full"
+                      className="w-full rounded-md border px-3 py-2 outline-none focus:border-violet-500"
                     />
                   </div>
 
-                  {/* Selector de Carpeta */}
-                  <div className="w-48"> {/* Puedes ajustar este ancho según prefieras */}
-                    <select
-                      value={selectedNote?.folderId ?? ''}
-                      onChange={(event) => {
-                        if (!selectedNote) return;
-                        const folderId = event.target.value || null;
-                        void noteService.moveNoteToFolder(selectedNote.id, folderId);
-                      }}
-                      className="w-full p-[7px] border-2 border-[#9b9b9b] focus:border-[#1b1b1b] focus:outline-none cursor-pointer"
-                    >
-                      <option value="">Sin carpeta</option>
-                      {folders.map((folder) => (
-                        <option key={folder.id} value={folder.id}>
-                          {folder.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {selectedNote && (
+                    <div className="w-full md:w-56">
+                      <label htmlFor="folder" className="mb-1 block text-sm font-medium">
+                        Carpeta
+                      </label>
+
+                      <select
+                        id="folder"
+                        value={selectedNote.folderId ?? ''}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          void handleMoveNote(value || null);
+                        }}
+                        className="w-full rounded-md border bg-white px-3 py-2 outline-none focus:border-violet-500"
+                      >
+                        <option value="">Sin carpeta</option>
+                        {folders.map(
+                          (folder) => (
+                            <option
+                              key={folder.id}
+                              value={folder.id}
+                            >
+                              {folder.name}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </section>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Contenido
+                  </label>
+                  <NoteEditor
+                    content={notesContent}
+                    onChange={handleContentChange}
+                  />
                 </div>
-              </section>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <p className="text-sm text-gray-500">
+                    Estado:{' '}
+                    {isSaving
+                      ? 'Guardando...'
+                      : isDirty
+                        ? 'Cambios pendientes'
+                        : 'Guardado'}
+                  </p>
 
-
-              <div>
-                <label htmlFor="content">
-                  Contenido
-                </label>
-                <br />
-
-                <NoteEditor
-                  content={notesContent}
-                  onChange={handleContentChange}
-                />
-              </div>
-              <br />
-
-              <p>
-                mss: {isSaving
-                  ? 'Guardando...' : isDirty
-                    ? 'Cambios pendientes'
-                    : 'Guardado'}
-              </p>
-
-              {selectedNote && (
-                <button onClick={handleMoveToTrash}>
-                  Enviar a papelera
-                </button>
-              )}
-            </>
-          )}
-
-          {viewMode === 'trash' &&
-            selectedDeletedNote && (
-              <>
-                <h2>{selectedDeletedNote.title}</h2>
-                <NoteEditor
-                  content={selectedDeletedNote.content}
-                  editable={false}
-                />
-                <br />
-
-                <button onClick={() => handleRestore(selectedDeletedNote.id)}>
-                  Restaurar
-                </button>
-                <button onClick={() => handleDeletePermanently(selectedDeletedNote.id)}>
-                  Eliminar definitivamente
-                </button>
+                  {selectedNote && (
+                    <button
+                      type="button"
+                      onClick={handleMoveToTrash}
+                      className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      Enviar a papelera
+                    </button>
+                  )}
+                </div>
               </>
             )}
-        </main>
+
+            {viewMode === 'trash' &&
+              selectedDeletedNote && (
+                <>
+                  <h2 className="mb-4 text-xl font-semibold">{selectedDeletedNote.title}</h2>
+                  <NoteEditor
+                    content={selectedDeletedNote.content}
+                    editable={false}
+                  />
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(selectedDeletedNote.id)}
+                      className="rounded bg-violet-600 px-4 py-2 text-white"
+                    >
+                      Restaurar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePermanently(selectedDeletedNote.id)}
+                      className="rounded border border-red-300 px-4 py-2 text-red-600"
+                    >
+                      Eliminar definitivamente
+                    </button>
+                  </div>
+                </>
+              )}
+          </main>
+        </div>
       </div>
     </div>
-  )
+  );
 }

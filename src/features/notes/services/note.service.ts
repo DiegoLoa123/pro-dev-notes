@@ -18,15 +18,20 @@ class NoteService {
   async createNote(
     title: string,
     content: string,
+    folderId: string | null = null,
   ): Promise<Note> {
-    const now = Date.now();
+    if (folderId !== null) {
+      const folder = await folderService.getFolderById(folderId);
+      if (!folder) throw new Error('La carpeta destino no existe.');
+    }
 
+    const now = Date.now();
     const note: Note = {
       id: crypto.randomUUID(),
-
       title: title.trim() || 'Sin título',
       content,
-      folderId: null,
+
+      folderId,
 
       createdAt: now,
       updatedAt: now,
@@ -36,7 +41,6 @@ class NoteService {
     };
 
     await noteRepository.create(note);
-
     return note;
   }
 

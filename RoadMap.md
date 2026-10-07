@@ -52,32 +52,28 @@
 # Fase 3 - Carpetas
 
 ## 3.1 Modelo y persistencia
-
-☐ Crear entidad Folder
-☐ Crear tabla folders
-☐ Añadir folderId a Note
-☐ Migración DB v2 → v3
+☑ Crear entidad Folder
+☑ Crear tabla folders
+☑ Añadir folderId a Note
+☑ Migración DB v2 → v3
 
 ## 3.2 CRUD
-
-☐ Crear carpeta
-☐ Listar carpetas
-☐ Renombrar carpeta
-☐ Eliminar carpeta
+☑ Crear carpeta
+☑ Listar carpetas
+☑ Renombrar carpeta
+☑ Eliminar carpeta
 
 ## 3.3 Notas y carpetas
-
-☐ Mover nota a carpeta
-☐ Mover nota a "Sin carpeta"
-☐ Filtrar notas por carpeta
+☑ Mover nota a carpeta
+☑ Mover nota a "Sin carpeta"
+☑ Filtrar notas por carpeta
 
 ## 3.4 Jerarquía
-
-☐ Añadir parentId
-☐ Crear subcarpetas
-☐ Mostrar árbol de carpetas
-☐ Mover carpetas
-☐ Evitar ciclos entre carpetas
+☑ Añadir parentId
+☑ Crear subcarpetas
+☑ Mostrar árbol de carpetas
+☑ Mover carpetas
+☑ Evitar ciclos entre carpetas
 
 ---
 
