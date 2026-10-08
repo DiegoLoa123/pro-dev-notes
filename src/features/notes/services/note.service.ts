@@ -1,5 +1,6 @@
 import type { Note } from '../domain/Note';
 import { noteRepository } from '../repositories/note.repository';
+import { folderService } from '../../folders/services/folder.service';
 
 class NoteService {
   async getNotes(): Promise<Note[]> {
@@ -17,24 +18,29 @@ class NoteService {
   async createNote(
     title: string,
     content: string,
+    folderId: string | null = null,
   ): Promise<Note> {
-    const now = Date.now();
+    if (folderId !== null) {
+      const folder = await folderService.getFolderById(folderId);
+      if (!folder) throw new Error('La carpeta destino no existe.');
+    }
 
+    const now = Date.now();
     const note: Note = {
       id: crypto.randomUUID(),
-
       title: title.trim() || 'Sin título',
       content,
+
+      folderId,
 
       createdAt: now,
       updatedAt: now,
 
-      isDeleted: false,
+      isDeleted: 0,
       deletedAt: null,
     };
 
     await noteRepository.create(note);
-
     return note;
   }
 
@@ -47,13 +53,8 @@ class NoteService {
   ): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
-
-    if (note.isDeleted) {
-      throw new Error('No se puede editar una nota eliminada.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (note.isDeleted) throw new Error('No se puede editar una nota eliminada.');
 
     await noteRepository.update(id, {
       ...data,
@@ -70,12 +71,11 @@ class NoteService {
   async moveToTrash(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (note.isDeleted) return;
 
     await noteRepository.update(id, {
-      isDeleted: true,
+      isDeleted: 1,
       deletedAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -84,12 +84,11 @@ class NoteService {
   async restoreNote(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
 
-    if (!note) {
-      throw new Error('La nota no existe.');
-    }
+    if (!note) throw new Error('La nota no existe.');
+    if (!note.isDeleted) return;
 
     await noteRepository.update(id, {
-      isDeleted: false,
+      isDeleted: 0,
       deletedAt: null,
       updatedAt: Date.now(),
     });
@@ -97,12 +96,34 @@ class NoteService {
 
   async deletePermanently(id: string): Promise<void> {
     const note = await noteRepository.findById(id);
+    if (!note) throw new Error('La nota no existe.');
+    await noteRepository.delete(id);
+  }
 
-    if (!note) {
-      throw new Error('La nota no existe.');
+
+  /* MOVE*/
+  async moveNoteToFolder(
+    noteId: string,
+    folderId: string | null,
+  ): Promise<void> {
+    const note = await noteRepository.findById(noteId);
+
+    if (!note) throw new Error('La nota no existe.');
+    if (note.isDeleted) throw new Error('No se puede mover una nota eliminada.');
+
+    if (folderId !== null) {
+      const folder = await folderService.getFolderById(folderId);
+      if (!folder) throw new Error('La carpeta destino no existe.');
     }
 
-    await noteRepository.delete(id);
+    await noteRepository.update(
+      noteId,
+      {
+        folderId,
+        updatedAt: Date.now(),
+      },
+    );
+
   }
 }
 

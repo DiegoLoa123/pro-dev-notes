@@ -6,11 +6,8 @@
 
 body {
   margin: 0;
-  padding: 20px;
-
   font-family: Arial, sans-serif;
 }
-
 button,
 input,
 textarea {
@@ -20,9 +17,70 @@ textarea {
 input,
 textarea {
   padding: 8px;
+  border: 2px solid #9b9b9b;
 }
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border: 2px solid #1b1b1b; 
+}
+
 
 button {
   padding: 6px 10px;
   cursor: pointer;
+}
+
+
+
+
+/** TipTap Editor Styles */
+.tiptap {
+  min-height: 400px;
+  padding: 12px;
+
+  border: 2px solid #999;
+
+  outline: none;
+}
+
+.tiptap:focus {
+  border-color: #333;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+}
+
+.tiptap h2 {
+  font-size: 1.5rem;
+}
+
+.tiptap h3 {
+  font-size: 1.25rem;
+}
+
+.tiptap blockquote {
+  border-left: 4px solid #999;
+  padding-left: 12px;
+}
+
+.tiptap pre {
+  padding: 12px;
+  background: #eee;
+}
+
+.tiptap code {
+  font-family: monospace;
+}
+
+.tiptap ul {
+  list-style: disc;
+  padding-left: 30px;
+}
+
+.tiptap ol {
+  list-style: decimal;
+  padding-left: 30px;
 }
