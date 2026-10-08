@@ -88,27 +88,53 @@
 
 ---
 
-# Fase 5 - Interlinks
+# Fase 5 - InterLinks
 
-☐ Sintaxis [[Nota]]
-☐ Resolver nota por ID
-☐ Navegar entre notas
-☐ Links persistentes al mover nota
-☐ Links persistentes al renombrar nota
-☐ Detectar enlaces rotos
-☐ Nextlinks y Backlinks
+## 5.1 Persistencia
+☑ Crear NoteLink
+☑ Crear tabla noteLinks
+☑ Migración DB v4 → v5
+☑ Repository
+☑ Service
+
+## 5.2 Sintaxis
+☑ Detectar [[Nota]]
+☑ Buscar nota por título
+☑ Convertir referencia a noteId
+☑ Mostrar enlace dentro de Tiptap
+
+## 5.3 Navegación
+☑ Click en link
+☑ Abrir nota destino
+☑ Mantener link al mover nota
+☑ Mantener link al renombrar nota
+☑ Modo lectura
+
+## 5.4 Relaciones
+☑ Nextlink / Adelante
+☑ Backlink / Atrás
+☑ Detectar enlaces rotos
 
 ---
 
-# Fases posteriores
+# Fase 6 - UI/UX
+Layout responsive, Tailwind, iconos, temas, modo lectura
+---
 
-☐ Búsqueda global
-☐ Buscar dentro de nota
-☐ Buscar/Reemplazar
-☐ Historial
-☐ Backup
-☐ Seguridad
-☐ Cloud backup
+# Fase 7 - Graph View
+Gráfico interactivo de notas, relaciones y filtros
+---
+
+# Fase 8 - Búsqueda
+Buscador global, Ctrl + K, sugerencias para [[Nota]]
+---
+
+# Fase 9 - PWA	Instalación
+service worker, caché offline y pruebas móviles
+---
+
+# Fase 10 - Asegurar Data
+Historial de acciones, Backup, *Seguridad* y Cloud backup
 
 
 ---

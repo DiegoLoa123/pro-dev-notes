@@ -10,25 +10,47 @@ import { tagService } from '../../tags/services/tag.service';
 import { TagManager } from '../../tags/components/TagManager';
 import { NoteTags } from '../../tags/components/NoteTags';
 
+import { interlinkService } from '../../interlinks/services/interlink.service';
+
 type ViewMode = | 'notes' | 'trash';
 
 export function NoteManager() {
   const [viewMode, setViewMode] = useState<ViewMode>('notes');
-  const [folderFilter, setFolderFilter] =
-    useState<string | null | undefined>(undefined); //undefined = todas | null = sin carpeta | string = folderId
+
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [notesTitle, setNotesTitle] = useState('');
+  const [notesContent, setNotesContent] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+
+  const [backHistory, setBackHistory] = useState<string[]>([]);
+  const [forwardHistory, setForwardHistory] = useState<string[]>([]);
+  const [isReadMode, setIsReadMode] = useState(false);
+
+  //undefined = todas | null = sin carpeta | string = folderId
+  const [folderFilter, setFolderFilter] = useState<string | null | undefined>(undefined);
 
   const notes = useLiveQuery(() => noteService.getNotes(), [], [],);
   const deletedNotes = useLiveQuery(() => noteService.getDeletedNotes(), [], [],);
   const folders = useLiveQuery(() => folderService.getFolders(), [], [],);
   const tags = useLiveQuery(() => tagService.getTags(), [], [],);
 
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const noteIdsByTag = useLiveQuery(() =>
     tagFilter
       ? tagService.getNoteIdsByTag(tagFilter)
       : Promise.resolve<string[]>([]),
     [tagFilter],[],
   );
+  
+  const brokenLinks =
+    useLiveQuery(
+      () => selectedNoteId
+        ? interlinkService.getBrokenLinks(selectedNoteId)
+        : Promise.resolve([]),
+      [selectedNoteId, notesContent], [],
+    );
 
   const visibleNotes = useMemo(() => {
     let result = notes;
@@ -47,12 +69,6 @@ export function NoteManager() {
     }
     return result;
   }, [notes, folderFilter, tagFilter, noteIdsByTag]);
-
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [notesTitle, setNotesTitle] = useState('');
-  const [notesContent, setNotesContent] = useState('');
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
@@ -83,7 +99,12 @@ export function NoteManager() {
     setSelectedNoteId(note.id);
     setNotesTitle(note.title);
     setNotesContent(note.content);
+
     setIsDirty(false);
+
+    setIsReadMode(false);
+    setBackHistory([]);
+    setForwardHistory([]);
   };
 
   const handleTitleChange = (
@@ -121,17 +142,15 @@ export function NoteManager() {
         if (selectedNoteId) {
           await noteService.updateNote(
             selectedNoteId,
-            {
-              title: notesTitle,
-              content: notesContent,
-            },
+            {title: notesTitle, content: notesContent},
           );
-        } else {
-          const initialFolderId =
-            typeof folderFilter === 'string'
-              ? folderFilter : null;
+          await interlinkService.syncFromContent(selectedNoteId, notesContent);
 
+        } else {
+          const initialFolderId = typeof folderFilter === 'string' ? folderFilter : null;
           const newNote = await noteService.createNote(notesTitle, notesContent, initialFolderId);
+          await interlinkService.syncFromContent(newNote.id, notesContent);
+
           setSelectedNoteId(newNote.id);
           setNotesTitle(newNote.title);
           setNotesContent(newNote.content);
@@ -172,14 +191,12 @@ export function NoteManager() {
     async (noteId: string) => {
       const confirmed = window.confirm('¿Eliminar esta nota definitivamente?');
       if (!confirmed) return;
-      await tagService.deleteNoteRelations(noteId);
+      //await tagService.deleteNoteRelations(noteId);
       await noteService.deletePermanently(noteId);
       resetEditor();
     };
 
-  const handleChangeView = (
-    mode: ViewMode,
-  ) => {
+  const handleChangeView = (mode: ViewMode) => {
     setViewMode(mode);
     resetEditor();
   };
@@ -199,6 +216,67 @@ export function NoteManager() {
         );
       }
     };
+
+  const handleOpenLinkedNote = (targetNoteId: string) => {
+    const target = notes.find((note) => note.id === targetNoteId);
+    if (!target) {
+      window.alert('⚠ El enlace está roto. La nota destino ya no existe.');
+      return;
+    }
+
+    if (selectedNoteId && selectedNoteId !== targetNoteId) {
+      setBackHistory((history) => [...history, selectedNoteId]);
+    }
+
+    setForwardHistory([]);
+    setSelectedNoteId(target.id);
+    setNotesTitle(target.title);
+    setNotesContent(target.content);
+    setIsDirty(false);
+
+    //Links Notas entran en modo lectura.
+    setIsReadMode(true);
+    setViewMode('notes');
+  };
+
+  const handleBack = () => {
+    if (backHistory.length === 0) return;
+
+    const previousId = backHistory[backHistory.length - 1];
+    const previous = notes.find((note) => note.id === previousId);
+    if (!previous) return;
+
+    if (selectedNoteId) {
+      setForwardHistory((history) => [selectedNoteId, ...history]);
+    }
+    setBackHistory((history) => history.slice(0, -1));
+
+    setSelectedNoteId(previous.id);
+    setNotesTitle(previous.title);
+    setNotesContent(previous.content);
+
+    setIsDirty(false);
+    setIsReadMode(true);
+  };
+  
+  const handleForward = () => {
+    if (forwardHistory.length === 0) return;
+    const nextId = forwardHistory[0];
+    const next = notes.find((note) => note.id === nextId);
+    if (!next) return;
+
+    if (selectedNoteId) {
+      setBackHistory((history) => [...history, selectedNoteId]);
+    }
+    setForwardHistory((history) => history.slice(1));
+
+    setSelectedNoteId(next.id);
+    setNotesTitle(next.title);
+    setNotesContent(next.content);
+
+    setIsDirty(false);
+    setIsReadMode(true);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -257,7 +335,7 @@ export function NoteManager() {
                       <button
                         type="button"
                         key={note.id}
-                        onClick={() => handleSelectNote(note)}
+                        onClick={() => {handleSelectNote(note)}}
                         className={`w-full truncate rounded-md px-3 py-2 text-left
                           ${selectedNoteId === note.id ? 'bg-violet-100 font-medium' : 'hover:bg-gray-100'}`}
                       >
@@ -304,6 +382,36 @@ export function NoteManager() {
           </aside>
 
           <main className="min-w-0 rounded-lg border bg-white p-5">
+            {selectedNote && (
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={backHistory.length === 0}
+                  onClick={handleBack}
+                  className="rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-100"
+                >
+                  ← Atrás
+                </button>
+
+                <button
+                  type="button"
+                  disabled={forwardHistory.length === 0}
+                  onClick={handleForward}
+                  className="rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-100"
+                >
+                  Adelante →
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsReadMode((value) => !value)}
+                  className="ml-auto rounded border px-3 py-1 hover:bg-gray-100"
+                >
+                  {isReadMode ? '✏️ Editar' : '👁 Modo lectura'}
+                </button>
+              </div>
+            )}
+
             {viewMode === 'notes' && (
               <>
                 <section className="mb-4 flex flex-col gap-4 md:flex-row md:items-end">
@@ -360,6 +468,9 @@ export function NoteManager() {
                   <NoteEditor
                     content={notesContent}
                     onChange={handleContentChange}
+                    editable={!isReadMode}
+                    notes={notes}
+                    onOpenNote={handleOpenLinkedNote}
                   />
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-3">
@@ -382,6 +493,15 @@ export function NoteManager() {
                     </button>
                   )}
                 </div>
+
+                {brokenLinks.length > 0 && (
+                  <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                    ⚠ Esta nota contiene{' '}
+                    {brokenLinks.length}
+                    {' '}enlace{brokenLinks.length === 1 ? '' : 's'}
+                    {' '}roto{brokenLinks.length === 1 ? '' : 's'}.
+                  </div>
+                )}
               </>
             )}
 

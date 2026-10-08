@@ -39,7 +39,28 @@ class NoteRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await db.notes.delete(id);
+    await db.transaction(
+      'rw',
+      db.notes,
+      db.noteTags,
+      db.noteLinks,
+      async () => {
+        // Eliminar asociaciones con tags
+        await db.noteTags
+          .where('noteId')
+          .equals(id)
+          .delete();
+
+        // Eliminar enlaces que salen de esta nota
+        await db.noteLinks
+          .where('sourceNoteId')
+          .equals(id)
+          .delete();
+
+        // Eliminar la nota
+        await db.notes.delete(id);
+      },
+    );
   }
 
 
