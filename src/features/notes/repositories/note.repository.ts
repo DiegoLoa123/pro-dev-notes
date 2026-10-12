@@ -63,11 +63,7 @@ class NoteRepository {
     );
   }
 
-
-  /**********/
-  async findByFolderId(
-    folderId: string,
-  ): Promise<Note[]> {
+  async findByFolderId(folderId: string): Promise<Note[]> {
     const notes = await db.notes
       .where('folderId')
       .equals(folderId)

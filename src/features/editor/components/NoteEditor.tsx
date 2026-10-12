@@ -118,7 +118,7 @@ export function NoteEditor({
     backgroundColor: isActive ? '#7c3aed' : '#ffffff',
     color: isActive ? '#ffffff' : disabled ? '#999999' : '#000000',
     border: '1px solid #999',
-    padding: '6px 10px',
+    padding: '2px 6px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.5 : 1
   });
@@ -143,7 +143,8 @@ export function NoteEditor({
       isCodeBlock: editor.isActive('codeBlock'),
 
       isHighlight: editor.isActive('highlight'),
-      isHighlightYellow: editor.isActive('highlight', { color: '#ffff00' }),
+      isHighlightYellow: editor.isActive('highlight', { color: '#ffbb00' }),
+      isHighlightGreen: editor.isActive('highlight', { color: '#36e04c' }),
       hasTextColor: Boolean(editor.getAttributes('textStyle').color),
 
       isTextRed: editor.isActive('textStyle', { color: '#ff0000' }),
@@ -281,15 +282,17 @@ export function NoteEditor({
           <button
             type="button"
             style={buttonStyle(editorState.isHighlightYellow)}
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .toggleHighlight({ color: '#ffff00' })
-                .run()
-            }
+            onClick={() => editor.chain().focus().toggleHighlight({ color: '#ffbb00' }).run()}
           >
-            Highlight
+            Highlight 1
+          </button>
+
+          <button
+            type="button"
+            style={buttonStyle(editorState.isHighlightGreen)}
+            onClick={() => editor.chain().focus().toggleHighlight({ color: '#36e04c' }).run()}
+          >
+            Highlight 2
           </button>
 
           {/* HISTORY */}

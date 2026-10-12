@@ -1,3 +1,4 @@
+import { Navigate, useLocation, useNavigate, } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 
@@ -5,17 +6,24 @@ import type { Note } from '../domain/Note';
 import { noteService } from '../services/note.service';
 import { NoteEditor } from '../../editor/components/NoteEditor';
 import { folderService } from '../../folders/services/folder.service';
-import { FolderSidebar } from '../../folders/components/FolderSidebar';
+//import { FolderSidebar } from '../../folders/components/FolderSidebar';
+//import { TagManager } from '../../tags/components/TagManager';
 import { tagService } from '../../tags/services/tag.service';
-import { TagManager } from '../../tags/components/TagManager';
 import { NoteTags } from '../../tags/components/NoteTags';
 
 import { interlinkService } from '../../interlinks/services/interlink.service';
 
-type ViewMode = | 'notes' | 'trash';
+import { AppShell } from '../../../shared/layouts/AppShell';
+import { NotesHeader } from './NotesHeader';
+import { NotesSidebar } from './NotesSidebar';
+
+//type ViewMode = | 'notes' | 'trash';
 
 export function NoteManager() {
-  const [viewMode, setViewMode] = useState<ViewMode>('notes');
+  //const [viewMode, setViewMode] = useState<'notes' | 'trash'>('notes');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const viewMode = location.pathname === '/trash' ? 'trash' : 'notes';
 
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [notesTitle, setNotesTitle] = useState('');
@@ -41,9 +49,9 @@ export function NoteManager() {
     tagFilter
       ? tagService.getNoteIdsByTag(tagFilter)
       : Promise.resolve<string[]>([]),
-    [tagFilter],[],
+    [tagFilter], [],
   );
-  
+
   const brokenLinks =
     useLiveQuery(
       () => selectedNoteId
@@ -90,7 +98,8 @@ export function NoteManager() {
 
   const handleNewNote = () => {
     resetEditor();
-    setViewMode('notes');
+    //setViewMode('notes');
+    navigate('/notes');
   };
 
   const handleSelectNote = (
@@ -142,7 +151,7 @@ export function NoteManager() {
         if (selectedNoteId) {
           await noteService.updateNote(
             selectedNoteId,
-            {title: notesTitle, content: notesContent},
+            { title: notesTitle, content: notesContent },
           );
           await interlinkService.syncFromContent(selectedNoteId, notesContent);
 
@@ -196,9 +205,10 @@ export function NoteManager() {
       resetEditor();
     };
 
-  const handleChangeView = (mode: ViewMode) => {
-    setViewMode(mode);
+  const handleChangeView = (mode: 'notes' | 'trash') => {
+    //setViewMode(mode);
     resetEditor();
+    navigate(mode === 'notes' ? '/notes' : '/trash');
   };
 
   const handleMoveNote =
@@ -236,7 +246,8 @@ export function NoteManager() {
 
     //Links Notas entran en modo lectura.
     setIsReadMode(true);
-    setViewMode('notes');
+    //setViewMode('notes');
+    navigate('/notes');
   };
 
   const handleBack = () => {
@@ -258,7 +269,7 @@ export function NoteManager() {
     setIsDirty(false);
     setIsReadMode(true);
   };
-  
+
   const handleForward = () => {
     if (forwardHistory.length === 0) return;
     const nextId = forwardHistory[0];
@@ -278,110 +289,41 @@ export function NoteManager() {
     setIsReadMode(true);
   };
 
+  if (
+    location.pathname !== '/notes' &&
+    location.pathname !== '/trash'
+  ) {
+    return <Navigate to="/notes" replace />;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-7xl p-4">
-        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">Offline Notes</h1>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleNewNote}
-              className="rounded bg-violet-600 px-4 py-2 text-white hover:bg-violet-700"
-            >
-              + Nueva nota
-            </button>
+    <AppShell
+      header={
+        <NotesHeader
+          onNewNote={handleNewNote}
+        />
+      }
+      sidebar={
+        <NotesSidebar
+          viewMode={viewMode}
+          notes={visibleNotes}
+          deletedNotes={deletedNotes}
+          folders={folders}
+          tags={tags}
+          selectedNoteId={selectedNoteId}
+          folderFilter={folderFilter}
+          tagFilter={tagFilter}
+          onSelectFolder={setFolderFilter}
+          onSelectTag={setTagFilter}
+          onSelectNote={handleSelectNote}
+        />
+      }
+    >
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        <div className="">
+          {/* <aside /> */}
 
-            <button
-              type="button"
-              onClick={() => handleChangeView('notes')}
-              className="rounded border bg-white px-4 py-2 hover:bg-gray-100"
-            >
-              Notas
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleChangeView('trash')}
-              className="rounded border bg-white px-4 py-2 hover:bg-gray-100"
-            >
-              Papelera
-            </button>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="rounded-lg border bg-white p-3">
-            {viewMode === 'notes' && (
-              <>
-                <FolderSidebar
-                  folders={folders}
-                  selectedFolderId={folderFilter}
-                  onSelectFolder={setFolderFilter}
-                />
-
-                <hr className="my-4" />
-                <h2 className="mb-2 font-semibold">Notas</h2>
-
-                {visibleNotes.length === 0 && (
-                  <p className="py-4 text-center text-sm text-gray-500">
-                    No tienes notas.
-                  </p>
-                )}
-
-                <div className="space-y-1">
-                  {visibleNotes.map(
-                    (note) => (
-                      <button
-                        type="button"
-                        key={note.id}
-                        onClick={() => {handleSelectNote(note)}}
-                        className={`w-full truncate rounded-md px-3 py-2 text-left
-                          ${selectedNoteId === note.id ? 'bg-violet-100 font-medium' : 'hover:bg-gray-100'}`}
-                      >
-                        {note.title}
-                      </button>
-                    ),
-                  )}
-                </div>
-
-                <hr className="my-4" />
-                <TagManager
-                  tags={tags}
-                  selectedTagId={tagFilter}
-                  onSelectTag={setTagFilter}
-                />
-              </>
-            )}
-
-            {viewMode === 'trash' && (
-              <>
-                <h2 className="mb-2 font-semibold">Papelera</h2>
-                {deletedNotes.length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    La papelera está vacía.
-                  </p>
-                )}
-
-                <div className="space-y-1">
-                  {deletedNotes.map(
-                    (note) => (
-                      <button
-                        type="button"
-                        key={note.id}
-                        onClick={() => handleSelectNote(note)}
-                        className="w-full truncate rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                      >
-                        {note.title}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </>
-            )}
-          </aside>
-
-          <main className="min-w-0 rounded-lg border bg-white p-5">
+          <main className="min-w-0">
             {selectedNote && (
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <button
@@ -421,6 +363,7 @@ export function NoteManager() {
                     <input
                       id="title"
                       value={notesTitle}
+                      readOnly={isReadMode}
                       onChange={(event) => handleTitleChange(event.target.value)}
                       placeholder="Título de la nota"
                       className="w-full rounded-md border px-3 py-2 outline-none focus:border-violet-500"
@@ -436,6 +379,7 @@ export function NoteManager() {
                       <select
                         id="folder"
                         value={selectedNote.folderId ?? ''}
+                        disabled={isReadMode}
                         onChange={(event) => {
                           const value = event.target.value;
                           void handleMoveNote(value || null);
@@ -455,7 +399,7 @@ export function NoteManager() {
                   )}
 
                   {selectedNote && (
-                    <NoteTags noteId={selectedNote.id} tags={tags}/>
+                    <NoteTags noteId={selectedNote.id} tags={tags} />
                   )}
 
                   <div className="mb-4" />
@@ -535,6 +479,6 @@ export function NoteManager() {
           </main>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -118,24 +118,49 @@
 ---
 
 # Fase 6 - UI/UX
-Layout responsive, Tailwind, iconos, temas, modo lectura
+☐ 6.0 React Router
+☐ 6.1 Refactor UI
+☐ 6.2 Sidebar
+☐ 6.3 Header
+☐ 6.4 Toolbar
+☐ 6.5 iconos
+☐ 6.6 Responsive
+☐ 6.7 Dark Mode
+☐ 6.8 Read Mode
+
 ---
 
 # Fase 7 - Graph View
-Gráfico interactivo de notas, relaciones y filtros
+☐ Backlinks reales
+☐ Graph Service
+☐ Graph View
+☐ Graph Filters
+
 ---
 
 # Fase 8 - Búsqueda
-Buscador global, Ctrl + K, sugerencias para [[Nota]]
+☐ Search Service
+☐ Global Search
+☐ Ctrl + K
+☐ [[Suggestions]]
+
 ---
 
 # Fase 9 - PWA	Instalación
-service worker, caché offline y pruebas móviles
+☐ Manifest
+☐ Service Worker
+☐ Install
+☐ Mobile/offline tests
+
 ---
 
 # Fase 10 - Asegurar Data
-Historial de acciones, Backup, *Seguridad* y Cloud backup
-
+☐ DB v6
+☐ Revision History
+☐ Local Backup
+☐ Restore
+☐ Encryption
+☐ Cloud Backup
 
 ---
 # Fase extra

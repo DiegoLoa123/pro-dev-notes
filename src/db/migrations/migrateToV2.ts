@@ -1,9 +1,5 @@
-// src/db/migrations/migrateToV2.ts
-
 export function plainTextToHtml(text: string): string {
-  if (!text) {
-    return '<p></p>';
-  }
+  if (!text) return '<p></p>';
 
   const escaped = text
     .replaceAll('&', '&amp;')
